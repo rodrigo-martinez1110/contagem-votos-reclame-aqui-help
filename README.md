@@ -1,6 +1,6 @@
 # Contagem de votos HELP — Prêmio Reclame Aqui
 
-Projeto para contabilizar prints enviados ao grupo do WhatsApp e exibir o placar em um app Streamlit. O OCR roda no computador; o ZIP e as imagens não são enviados a serviços externos. O app lê `ranking_publico.csv`, que é atualizado manualmente depois de conferir o processamento. A página destaca a última atualização, mantém os cards de KPI, exibe a premiação do Top 3, compara os sete primeiros em um gráfico Plotly e permite buscar nomes ou os quatro últimos dígitos na tabela completa.
+Projeto para contabilizar prints enviados ao grupo do WhatsApp e exibir o placar em um app Streamlit. O OCR roda no computador; o ZIP e as imagens não são enviados a serviços externos. O app lê `ranking_publico.csv`, que é atualizado manualmente depois de conferir o processamento. A página destaca a última atualização, mantém os cards de KPI, exibe a premiação do Top 3, compara os sete primeiros em um gráfico Plotly e permite buscar nomes ou os quatro últimos dígitos na tabela completa. A tabela indica quantos votos faltam para cada pessoa alcançar a colocação imediatamente acima.
 
 ## O que fica público
 

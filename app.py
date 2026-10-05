@@ -56,15 +56,18 @@ def load_ranking(path: Path) -> tuple[list[dict[str, Any]], str]:
     return rows, updated_at
 
 
-def add_top3_goal(rows: list[dict[str, Any]]) -> None:
-    third_place_votes = rows[2]["Votos HELP"] if len(rows) >= 3 else 0
+def add_progress_goal(rows: list[dict[str, Any]]) -> None:
     for index, row in enumerate(rows):
-        if index < 3:
-            row["Votos para o Top 3"] = "✅ Já está no Top 3"
-        else:
-            votes_to_top3 = max(1, third_place_votes - row["Votos HELP"] + 1)
-            noun = "voto" if votes_to_top3 == 1 else "votos"
-            row["Votos para o Top 3"] = f"Faltam {votes_to_top3} {noun}"
+        if index == 0:
+            row["Próximo objetivo"] = "🥇 Líder"
+            continue
+
+        target_index = index - 1 if index <= 2 else 2
+        target_row = rows[target_index]
+        target_place = target_index + 1
+        votes_needed = max(1, target_row["Votos HELP"] - row["Votos HELP"] + 1)
+        noun = "voto" if votes_needed == 1 else "votos"
+        row["Próximo objetivo"] = f"Faltam {votes_needed} {noun} para o {target_place}º lugar"
 
 
 st.set_page_config(
@@ -137,7 +140,7 @@ if not ranking:
     st.info("O ranking está vazio.")
     st.stop()
 
-add_top3_goal(ranking)
+add_progress_goal(ranking)
 
 try:
     parsed_update = datetime.fromisoformat(updated_at)
@@ -234,8 +237,8 @@ st.plotly_chart(figure, use_container_width=True, config={"displayModeBar": Fals
 st.divider()
 st.subheader("📣 Sua posição no ranking")
 st.caption(
-    "Veja quantos votos faltam para entrar no Top 3. A conta considera ultrapassar "
-    "a pessoa que está atualmente na terceira posição."
+    "O próximo objetivo muda conforme sua posição: subir uma colocação dentro do Top 3 "
+    "ou alcançar o terceiro lugar para quem está fora dele."
 )
 
 table_data = pd.DataFrame(
@@ -245,7 +248,7 @@ table_data = pd.DataFrame(
             "Pessoa": row["Pessoa"],
             "Final do celular": row["Celular final 4"] or "—",
             "Votos HELP": row["Votos HELP"],
-            "Votos para o Top 3": row["Votos para o Top 3"],
+            "Próximo objetivo": row["Próximo objetivo"],
         }
         for row in ranking
     ]
@@ -280,9 +283,9 @@ st.dataframe(
         "Pessoa": st.column_config.TextColumn("Pessoa"),
         "Final do celular": st.column_config.TextColumn("Final 4"),
         "Votos HELP": st.column_config.NumberColumn("Votos HELP", format="%d"),
-        "Votos para o Top 3": st.column_config.TextColumn(
-            "Votos para o Top 3",
-            help="Votos necessários para ultrapassar quem ocupa o terceiro lugar.",
+        "Próximo objetivo": st.column_config.TextColumn(
+            "Próximo objetivo",
+            help="Votos necessários para ultrapassar a pessoa logo acima, ou alcançar o Top 3.",
         ),
     },
 )
