@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import html
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,11 @@ EXPECTED_COLUMNS = {
     "Atualizado em",
 }
 COUNT_COLUMNS = ("Posição", "Votos HELP", "BMG (não conta)", "Sem comprovante", "Revisar")
+
+
+def normalize_search_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value).casefold()
+    return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
 def load_ranking(path: Path) -> tuple[list[dict[str, Any]], str]:
@@ -244,8 +250,29 @@ table_data = pd.DataFrame(
         for row in ranking
     ]
 )
+
+search_text = st.text_input(
+    "🔎 Procure seu nome na tabela",
+    placeholder="Digite seu nome ou os quatro últimos dígitos do celular",
+)
+visible_table = table_data
+if search_text.strip():
+    normalized_query = normalize_search_text(search_text.strip())
+    match_mask = table_data.apply(
+        lambda row: normalized_query in normalize_search_text(str(row["Pessoa"]))
+        or normalized_query in str(row["Final do celular"]),
+        axis=1,
+    )
+    visible_table = table_data[match_mask]
+    if visible_table.empty:
+        st.info("Não encontrei esse nome ou final de celular no ranking.")
+    else:
+        st.caption(f"Encontradas {len(visible_table)} pessoa(s).")
+else:
+    st.caption(f"Todas as {len(table_data)} pessoas do ranking")
+
 st.dataframe(
-    table_data,
+    visible_table,
     hide_index=True,
     use_container_width=True,
     column_config={
