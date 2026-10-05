@@ -1,6 +1,6 @@
 # Contagem de votos HELP — Prêmio Reclame Aqui
 
-Projeto local para contabilizar prints enviados ao grupo do WhatsApp. O OCR roda no computador; o ZIP e as imagens não são enviados a serviços externos. O arquivo `ranking_publico.csv` é a cópia publicada no GitHub para consumo por um app Streamlit.
+Projeto para contabilizar prints enviados ao grupo do WhatsApp e exibir o placar em um app Streamlit. O OCR roda no computador; o ZIP e as imagens não são enviados a serviços externos. O app lê `ranking_publico.csv`, que é atualizado manualmente depois de conferir o processamento.
 
 ## O que fica público
 
@@ -18,6 +18,14 @@ O ZIP exportado do WhatsApp, imagens, planilhas detalhadas, `dim_pessoas.csv` (a
    ```powershell
    python -m pip install -r requirements.txt
    ```
+
+## Abrir o ranking localmente
+
+```powershell
+streamlit run app.py
+```
+
+O navegador abrirá o placar. O app mostra o total HELP, o líder, os participantes, os quatro últimos dígitos e a data/hora da última atualização.
 
 ## Dados locais necessários
 
@@ -54,6 +62,12 @@ git push
 ```
 
 O ZIP, as imagens, os relatórios Excel, a dimensão e as correções não devem ser adicionados ao Git. O `.gitignore` já cobre esses arquivos.
+
+## Publicar o app
+
+O app está pronto para implantação pelo Streamlit Community Cloud. Acesse <https://share.streamlit.io/>, conecte o GitHub, crie um app e selecione este repositório, a branch `main` e o arquivo `app.py`. Como o repositório é público, o placar implantado também ficará acessível publicamente. A documentação oficial descreve o fluxo de implantação: <https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy>.
+
+Depois da implantação, cada atualização enviada ao `ranking_publico.csv` no GitHub será carregada pelo app.
 
 ## Regras de contagem
 
