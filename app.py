@@ -70,7 +70,10 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .block-container {max-width: 1220px; padding-top: 2rem; padding-bottom: 3rem;}
+    .block-container {
+        max-width: none; margin-left: 0; margin-right: 0;
+        padding: 2rem 1.5rem 3rem;
+    }
     div[data-testid="stMetric"] {
         background: linear-gradient(145deg, #202b3a, #17212e);
         border: 1px solid #3a4a60; border-radius: 14px;
