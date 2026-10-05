@@ -96,6 +96,17 @@ st.markdown(
         letter-spacing: .08em; text-transform: uppercase;}
     .last-update-value {color: #431407; font-size: 1.15rem; font-weight: 700;
         margin-top: 2px;}
+    .prize-card {
+        min-height: 112px; padding: 18px 14px; text-align: center;
+        border: 1px solid #3a4a60; border-radius: 14px;
+        background: linear-gradient(145deg, #202b3a, #17212e);
+        box-shadow: 0 5px 16px rgba(0, 0, 0, .18);
+    }
+    .prize-place {font-size: .95rem; font-weight: 750; color: #cbd5e1;}
+    .prize-value {margin-top: 8px; font-size: 1.9rem; font-weight: 850; color: #f8fafc;}
+    .prize-card.gold {border-top: 4px solid #facc15;}
+    .prize-card.silver {border-top: 4px solid #cbd5e1;}
+    .prize-card.bronze {border-top: 4px solid #d9905b;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -140,6 +151,23 @@ left, middle, right = st.columns(3)
 left.metric("Votos para HELP", f"{total_help:,}".replace(",", "."))
 middle.metric("Pessoas no ranking", len(ranking))
 right.metric("Líder atual", first_place["Pessoa"])
+
+st.divider()
+st.subheader("🎁 Premiação do Top 3")
+prize_columns = st.columns(3)
+prizes = [
+    ("gold", "🥇 1º lugar", "R$ 700"),
+    ("silver", "🥈 2º lugar", "R$ 500"),
+    ("bronze", "🥉 3º lugar", "R$ 300"),
+]
+for column, (style, place, value) in zip(prize_columns, prizes):
+    with column:
+        st.markdown(
+            f'<div class="prize-card {style}">'
+            f'<div class="prize-place">{place}</div>'
+            f'<div class="prize-value">{value}</div></div>',
+            unsafe_allow_html=True,
+        )
 
 st.divider()
 st.subheader("🔥 Disputa do Top 7")
