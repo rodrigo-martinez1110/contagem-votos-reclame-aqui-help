@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# Originais do WhatsApp e evidências pessoais: manter só localmente
+*.zip
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.bmp
+*.tif
+*.tiff
+*_imagens_revisar*/
+
+# Relatórios locais podem conter OCR, remetentes e dados dos clientes
+*.xlsx
+*.xls
+*.xlsm
+
+# Dados auxiliares locais (nomes de perfil/aliases e correções de imagens)
+/dim_pessoas.csv
+/correcoes_votos.csv
+
+# CSV automático do processamento; o arquivo público escolhido é mantido
+*_ranking.csv
+!ranking_publico.csv
