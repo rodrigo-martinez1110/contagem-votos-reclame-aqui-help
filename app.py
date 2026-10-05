@@ -119,6 +119,25 @@ st.markdown(
     .prize-card.gold {border-top: 4px solid #facc15;}
     .prize-card.silver {border-top: 4px solid #cbd5e1;}
     .prize-card.bronze {border-top: 4px solid #d9905b;}
+    @media (max-width: 700px) {
+        .block-container {padding: 1rem .75rem 2rem;}
+        h1 {font-size: 1.7rem !important;}
+        h2, h3 {font-size: 1.25rem !important;}
+        div[data-testid="stHorizontalBlock"] {
+            flex-direction: column !important; gap: .55rem !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+            width: 100% !important; flex: 1 1 100% !important; min-width: 0 !important;
+        }
+        div[data-testid="stMetric"] {padding: 12px 14px;}
+        .last-update {gap: 10px; padding: 12px 14px; margin-bottom: 16px;}
+        .last-update-value {font-size: 1rem;}
+        .prize-card {min-height: 0; padding: 12px;}
+        .prize-value {font-size: 1.55rem;}
+        div[data-testid="stPlotlyChart"], div[data-testid="stDataFrame"] {
+            max-width: 100%;
+        }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -212,7 +231,7 @@ figure.update_traces(
     hovertemplate="<b>%{y}</b><br>Votos HELP: %{x}<extra></extra>",
 )
 figure.update_layout(
-    height=max(390, 66 * len(top7) + 80),
+    height=max(390, 60 * len(top7) + 75),
     margin={"l": 8, "r": 36, "t": 12, "b": 12},
     plot_bgcolor="rgba(0,0,0,0)",
     paper_bgcolor="rgba(0,0,0,0)",
