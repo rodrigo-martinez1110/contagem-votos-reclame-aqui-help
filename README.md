@@ -33,6 +33,8 @@ Crie `dim_pessoas.csv` ao lado do script com as colunas `Nome no ranking`, `Alia
 
 Opcionalmente, crie `correcoes_votos.csv` com as colunas `Arquivo` e `Classificação` para correções visuais manuais. Esse arquivo também é local.
 
+Para não publicar determinados membros no ranking, crie `pessoas_excluidas.csv` ao lado do script com a coluna `Nome ou alias`, uma pessoa ou alias por linha. O script associa aliases cadastrados em `dim_pessoas.csv` ao nome do ranking e os omite do CSV público. Esse arquivo é local e ignorado pelo Git.
+
 Mantenha o ZIP exportado do WhatsApp localmente. O script precisa que a exportação inclua `_chat.txt` e as mídias.
 
 ## Contar os votos

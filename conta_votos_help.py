@@ -420,8 +420,14 @@ def write_ranking_csv(
     records: list[dict[str, str]],
     people: dict[str, dict[str, str]],
     output_path: Path,
+    excluded_people: set[str] | None = None,
 ) -> None:
     totals, last4_by_name = aggregate_people(records, people)
+    excluded_people = excluded_people or set()
+    ranking_people = [
+        name for name in ordered_people(totals)
+        if normalize_person_key(name) not in excluded_people
+    ]
     updated_at = datetime.now().astimezone().isoformat(timespec="seconds")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8-sig", newline="") as destination:
@@ -430,7 +436,7 @@ def write_ranking_csv(
             "Posição", "Pessoa", "Celular final 4", "Votos HELP", "BMG (não conta)",
             "Sem comprovante", "Revisar", "Atualizado em",
         ])
-        for position, name in enumerate(ordered_people(totals), start=1):
+        for position, name in enumerate(ranking_people, start=1):
             writer.writerow([
                 position, name, last4_by_name.get(name, ""), totals[name]["HELP"],
                 totals[name]["BMG"], totals[name]["SEM COMPROVANTE"],
@@ -480,6 +486,29 @@ def read_manual_corrections(path: Path) -> dict[str, str]:
     return corrections
 
 
+def read_excluded_ranking_people(
+    path: Path,
+    people_by_alias: dict[str, dict[str, str]],
+) -> set[str]:
+    """Read local names/WhatsApp aliases that should not appear in the public ranking."""
+    if not path.is_file():
+        return set()
+
+    excluded: set[str] = set()
+    with path.open("r", encoding="utf-8-sig", newline="") as source:
+        reader = csv.DictReader(source)
+        if not reader.fieldnames or "Nome ou alias" not in reader.fieldnames:
+            raise ValueError(f"{path.name} precisa ter a coluna 'Nome ou alias'.")
+        for row in reader:
+            value = (row.get("Nome ou alias") or "").strip()
+            key = normalize_person_key(value)
+            if not key:
+                continue
+            person = people_by_alias.get(key)
+            excluded.add(normalize_person_key(person["Nome"]) if person else key)
+    return excluded
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Conta prints de votos para HELP em uma exportação ZIP do WhatsApp."
@@ -509,6 +538,8 @@ def main() -> int:
         manual_corrections = read_manual_corrections(correction_path)
         people_path = Path(__file__).with_name("dim_pessoas.csv")
         people, people_by_alias = read_people_dimension(people_path)
+        exclusions_path = Path(__file__).with_name("pessoas_excluidas.csv")
+        excluded_people = read_excluded_ranking_people(exclusions_path, people_by_alias)
         with zipfile.ZipFile(args.zip) as archive:
             messages = read_messages(archive)
             records: list[dict[str, str]] = []
@@ -551,7 +582,7 @@ def main() -> int:
             copy_review_images(archive, messages, records, output)
         write_workbook(records, output, people)
         ranking_output = output.with_name(f"{output.stem}_ranking.csv")
-        write_ranking_csv(records, people, ranking_output)
+        write_ranking_csv(records, people, ranking_output, excluded_people)
     except (OSError, zipfile.BadZipFile, RuntimeError, ValueError) as exc:
         safe_console_print(f"Erro: {exc}", sys.stderr)
         return 1
