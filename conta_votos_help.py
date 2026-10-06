@@ -6,9 +6,11 @@ from __future__ import annotations
 import argparse
 import csv
 from datetime import datetime
+import hashlib
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -21,6 +23,9 @@ from pathlib import Path, PurePosixPath
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+
+
+OCR_CACHE_PIPELINE_VERSION = "tesseract-por-eng-psm6-v1"
 
 
 MESSAGE_RE = re.compile(
@@ -226,17 +231,25 @@ def safe_console_print(message: str, stream) -> None:
     print(printable, file=stream)
 
 
-def ocr_image(archive: zipfile.ZipFile, record: ImageMessage, executable: str) -> tuple[str, str]:
+def ocr_image(
+    archive: zipfile.ZipFile,
+    record: ImageMessage,
+    executable: str,
+    image_bytes: bytes | None = None,
+) -> tuple[str, str]:
     if record.zip_entry is None:
         return "", "Arquivo de imagem não encontrado dentro do ZIP."
 
     suffix = PurePosixPath(record.filename).suffix or ".jpg"
     temp_path: str | None = None
     try:
-        with archive.open(record.zip_entry) as source:
-            with tempfile.NamedTemporaryFile(prefix="voto_", suffix=suffix, delete=False) as temp:
-                temp_path = temp.name
-                shutil.copyfileobj(source, temp)
+        with tempfile.NamedTemporaryFile(prefix="voto_", suffix=suffix, delete=False) as temp:
+            temp_path = temp.name
+            if image_bytes is None:
+                with archive.open(record.zip_entry) as source:
+                    shutil.copyfileobj(source, temp)
+            else:
+                temp.write(image_bytes)
 
         result = subprocess.run(
             [executable, temp_path, "stdout", "-l", "por+eng", "--psm", "6"],
@@ -444,6 +457,43 @@ def write_ranking_csv(
             ])
 
 
+class OCRCache:
+    """Persistent local cache keyed by image content and OCR pipeline version."""
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.connection = sqlite3.connect(path)
+        self.connection.execute(
+            "CREATE TABLE IF NOT EXISTS ocr_cache ("
+            "cache_key TEXT PRIMARY KEY, recognized_text TEXT NOT NULL, error TEXT NOT NULL)"
+        )
+        self.connection.commit()
+
+    @staticmethod
+    def key_for(image_bytes: bytes) -> str:
+        digest = hashlib.sha256(image_bytes).hexdigest()
+        return f"{OCR_CACHE_PIPELINE_VERSION}:{digest}"
+
+    def get(self, cache_key: str) -> tuple[str, str] | None:
+        row = self.connection.execute(
+            "SELECT recognized_text, error FROM ocr_cache WHERE cache_key = ?", (cache_key,)
+        ).fetchone()
+        return (str(row[0]), str(row[1])) if row else None
+
+    def put(self, cache_key: str, recognized_text: str, error: str) -> None:
+        # Do not retain failures: a later run should get another chance to OCR the image.
+        if error:
+            return
+        self.connection.execute(
+            "INSERT OR REPLACE INTO ocr_cache (cache_key, recognized_text, error) VALUES (?, ?, '')",
+            (cache_key, recognized_text),
+        )
+        self.connection.commit()
+
+    def close(self) -> None:
+        self.connection.close()
+
+
 def read_ocr_cache(path: Path | None) -> dict[tuple[str, str, str], str]:
     """Reuse prior OCR for matching sender/time/file entries in a previous report."""
     if path is None:
@@ -517,7 +567,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, help="Caminho opcional para o Excel de saída.")
     parser.add_argument(
         "--reuse-ocr-from", type=Path,
-        help="Reaproveita o OCR de um Excel anterior para imagens com remetente, horário e arquivo iguais.",
+        help="Importa OCR de um Excel anterior uma vez, para inicializar o cache local.",
     )
     parser.add_argument(
         "--tesseract", default="tesseract",
@@ -533,7 +583,10 @@ def main() -> int:
 
     try:
         executable = resolve_tesseract(args.tesseract)
-        ocr_cache = read_ocr_cache(args.reuse_ocr_from)
+        previous_report_cache = read_ocr_cache(args.reuse_ocr_from)
+        local_ocr_cache = OCRCache(Path(__file__).with_name(".ocr_cache.sqlite3"))
+        cache_hits = 0
+        ocr_runs = 0
         correction_path = Path(__file__).with_name("correcoes_votos.csv")
         manual_corrections = read_manual_corrections(correction_path)
         people_path = Path(__file__).with_name("dim_pessoas.csv")
@@ -545,16 +598,28 @@ def main() -> int:
             records: list[dict[str, str]] = []
             total = len(messages)
             for index, message in enumerate(messages, start=1):
-                cache_key = (message.sender, message.timestamp, message.filename)
-                cached_text = ocr_cache.get(cache_key)
-                if cached_text and classify(cached_text) != "REVISAR":
-                    text, error = cached_text, ""
-                    safe_console_print(f"Reutilizando OCR {index}/{total}: {message.filename}", sys.stderr)
+                image_bytes = archive.read(message.zip_entry) if message.zip_entry else None
+                image_hash = OCRCache.key_for(image_bytes) if image_bytes is not None else None
+                persistent_result = local_ocr_cache.get(image_hash) if image_hash else None
+                legacy_key = (message.sender, message.timestamp, message.filename)
+                legacy_text = previous_report_cache.get(legacy_key)
+                if persistent_result is not None:
+                    text, error = persistent_result
+                    cache_hits += 1
+                    safe_console_print(f"Cache OCR {index}/{total}: {message.filename}", sys.stderr)
+                elif legacy_text is not None:
+                    # An explicitly supplied old report can seed the content-addressed cache.
+                    text, error = legacy_text, ""
+                    if image_hash:
+                        local_ocr_cache.put(image_hash, text, error)
+                    cache_hits += 1
+                    safe_console_print(f"Importando OCR anterior {index}/{total}: {message.filename}", sys.stderr)
                 else:
                     safe_console_print(f"Processando print {index}/{total}: {message.filename}", sys.stderr)
-                    text, error = ocr_image(archive, message, executable)
-                    if cached_text and cached_text not in text:
-                        text = f"{cached_text}\n[OCR atualizado]\n{text}".strip()
+                    text, error = ocr_image(archive, message, executable, image_bytes)
+                    ocr_runs += 1
+                    if image_hash:
+                        local_ocr_cache.put(image_hash, text, error)
                 result = "REVISAR" if error else classify(text)
                 correction = manual_corrections.get(message.filename.casefold())
                 if correction:
@@ -583,7 +648,8 @@ def main() -> int:
         write_workbook(records, output, people)
         ranking_output = output.with_name(f"{output.stem}_ranking.csv")
         write_ranking_csv(records, people, ranking_output, excluded_people)
-    except (OSError, zipfile.BadZipFile, RuntimeError, ValueError) as exc:
+        local_ocr_cache.close()
+    except (OSError, sqlite3.Error, zipfile.BadZipFile, RuntimeError, ValueError) as exc:
         safe_console_print(f"Erro: {exc}", sys.stderr)
         return 1
 
@@ -592,6 +658,10 @@ def main() -> int:
     review_count = sum(record["Classificação"] == "REVISAR" for record in records)
     safe_console_print(f"Planilha criada: {output}", sys.stdout)
     safe_console_print(f"Ranking CSV criado: {ranking_output}", sys.stdout)
+    safe_console_print(
+        f"Cache OCR local: {cache_hits} reutilizados | {ocr_runs} imagens novas lidas",
+        sys.stdout,
+    )
     no_proof_count = sum(record["Classificação"] == "SEM COMPROVANTE" for record in records)
     safe_console_print(
         f"HELP: {help_count} | BMG (não conta): {bmg_count} | "

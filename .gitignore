@@ -18,6 +18,8 @@ venv/
 *_imagens_revisar*/
 
 # Relatórios locais podem conter OCR, remetentes e dados dos clientes
+.ocr_cache.sqlite3
+.ocr_cache.sqlite3-*
 *.xlsx
 *.xls
 *.xlsm

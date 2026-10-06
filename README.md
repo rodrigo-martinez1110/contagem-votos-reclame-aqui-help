@@ -46,6 +46,14 @@ python .\conta_votos_help.py --zip "C:\caminho\WhatsApp Chat.zip" --output ".\co
 ```
 
 O Excel detalhado e as imagens de revisão ficam locais e são ignorados pelo Git. O script também gera `contagem_local_ranking.csv`, que é ignorado automaticamente.
+Na primeira execução, imagens antigas ainda podem precisar de OCR. A partir daí, o script grava os resultados num cache SQLite local (`.ocr_cache.sqlite3`) e compara o conteúdo das imagens; exportações seguintes fazem OCR só em imagens novas ou alteradas. Refaça a contagem normalmente com o mesmo comando. Falhas de OCR serão tentadas novamente na próxima execução. O cache é local, ignorado pelo Git e pode ser apagado para reconstruí-lo.
+
+Se você já tem um relatório detalhado anterior, pode carregá-lo uma vez para inicializar o cache e evitar OCR das imagens que já foram reconhecidas:
+
+```powershell
+python .\conta_votos_help.py --zip "C:\caminho\WhatsApp Chat.zip" --output ".\contagem_local.xlsx" --reuse-ocr-from ".\contagem_local_anterior.xlsx" --tesseract "C:\Program Files\Tesseract-OCR\tesseract.exe"
+```
+
 
 ## Atualizar o ranking publicado
 
