@@ -35,6 +35,8 @@ Opcionalmente, crie `correcoes_votos.csv` com as colunas `Arquivo` e `Classifica
 
 Para não publicar determinados membros no ranking, crie `pessoas_excluidas.csv` ao lado do script com a coluna `Nome ou alias`, uma pessoa ou alias por linha. O script associa aliases cadastrados em `dim_pessoas.csv` ao nome do ranking e os omite do CSV público. Esse arquivo é local e ignorado pelo Git.
 
+Opcionalmente, use `votos_multiplicadores.csv` para imagens HELP que comprovem mais de um voto. Crie as colunas `Arquivo` e `Votos HELP`; informe o nome da imagem e o total de votos HELP comprovados nela. Sem ajuste, cada imagem HELP conta como 1. Esse arquivo também é local e ignorado pelo Git.
+
 Mantenha o ZIP exportado do WhatsApp localmente. O script precisa que a exportação inclua `_chat.txt` e as mídias.
 
 ## Contar os votos

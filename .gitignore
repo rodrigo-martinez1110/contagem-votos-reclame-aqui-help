@@ -28,6 +28,7 @@ venv/
 /dim_pessoas.csv
 /correcoes_votos.csv
 /pessoas_excluidas.csv
+/votos_multiplicadores.csv
 
 # CSV automático do processamento; o arquivo público escolhido é mantido
 *_ranking.csv

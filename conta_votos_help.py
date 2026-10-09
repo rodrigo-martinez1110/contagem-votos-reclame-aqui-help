@@ -350,7 +350,11 @@ def aggregate_people(
         totals[name]
     for record in records:
         name = record["Pessoa"]
-        totals[name][record["Classificação"]] += 1
+        classification = record["Classificação"]
+        if classification == "HELP":
+            totals[name]["HELP"] += int(record.get("Votos HELP contados", "1") or 1)
+        else:
+            totals[name][classification] += 1
         last4_by_name.setdefault(name, record["Celular final 4"])
     return totals, last4_by_name
 
@@ -395,15 +399,15 @@ def write_workbook(
     details = workbook.create_sheet("Detalhes")
     details.append([
         "Pessoa", "Remetente", "Celular (final 4)", "Data/hora", "Arquivo", "Classificação",
-        "Motivo revisão", "Texto OCR", "Erro",
+        "Votos HELP contados", "Motivo revisão", "Texto OCR", "Erro",
     ])
     for record in records:
         details.append([
             record["Pessoa"], record["Remetente"], record["Celular final 4"], record["Data/hora"],
-            record["Arquivo"], record["Classificação"], record["Motivo revisão"],
-            record["Texto OCR"], record["Erro"],
+            record["Arquivo"], record["Classificação"], record["Votos HELP contados"],
+            record["Motivo revisão"], record["Texto OCR"], record["Erro"],
         ])
-    set_sheet_style(details, [30, 30, 18, 22, 48, 18, 54, 72, 48])
+    set_sheet_style(details, [30, 30, 18, 22, 48, 18, 20, 54, 72, 48])
 
     review = workbook.create_sheet("Revisar")
     review.append([
@@ -536,6 +540,31 @@ def read_manual_corrections(path: Path) -> dict[str, str]:
     return corrections
 
 
+def read_vote_multipliers(path: Path) -> dict[str, int]:
+    """Read local per-image HELP vote counts; the default is one vote per image."""
+    if not path.is_file():
+        return {}
+
+    multipliers: dict[str, int] = {}
+    with path.open("r", encoding="utf-8-sig", newline="") as source:
+        reader = csv.DictReader(source)
+        required = {"Arquivo", "Votos HELP"}
+        if not reader.fieldnames or not required.issubset(reader.fieldnames):
+            raise ValueError(f"{path.name} precisa ter as colunas 'Arquivo' e 'Votos HELP'.")
+        for row in reader:
+            filename = Path((row.get("Arquivo") or "").strip()).name.casefold()
+            if not filename:
+                continue
+            try:
+                votes = int((row.get("Votos HELP") or "").strip())
+            except ValueError as exc:
+                raise ValueError(f"Quantidade de votos inválida para {filename} em {path.name}.") from exc
+            if votes < 1:
+                raise ValueError(f"A quantidade de votos para {filename} deve ser pelo menos 1.")
+            multipliers[filename] = votes
+    return multipliers
+
+
 def read_excluded_ranking_people(
     path: Path,
     people_by_alias: dict[str, dict[str, str]],
@@ -589,6 +618,8 @@ def main() -> int:
         ocr_runs = 0
         correction_path = Path(__file__).with_name("correcoes_votos.csv")
         manual_corrections = read_manual_corrections(correction_path)
+        multiplier_path = Path(__file__).with_name("votos_multiplicadores.csv")
+        vote_multipliers = read_vote_multipliers(multiplier_path)
         people_path = Path(__file__).with_name("dim_pessoas.csv")
         people, people_by_alias = read_people_dimension(people_path)
         exclusions_path = Path(__file__).with_name("pessoas_excluidas.csv")
@@ -636,6 +667,9 @@ def main() -> int:
                     "Data/hora": message.timestamp,
                     "Arquivo": message.filename,
                     "Classificação": result,
+                    "Votos HELP contados": (
+                        vote_multipliers.get(message.filename.casefold(), 1) if result == "HELP" else 0
+                    ),
                     "Motivo revisão": (
                         f"Correção manual registrada em {correction_path.name}." if correction
                         else review_reason(text, error, message.zip_entry)
@@ -653,7 +687,11 @@ def main() -> int:
         safe_console_print(f"Erro: {exc}", sys.stderr)
         return 1
 
-    help_count = sum(record["Classificação"] == "HELP" for record in records)
+    help_count = sum(
+        int(record["Votos HELP contados"])
+        for record in records
+        if record["Classificação"] == "HELP"
+    )
     bmg_count = sum(record["Classificação"] == "BMG" for record in records)
     review_count = sum(record["Classificação"] == "REVISAR" for record in records)
     safe_console_print(f"Planilha criada: {output}", sys.stdout)
